@@ -101,8 +101,8 @@ DATABASES = {
         'OPTIONS': {'timeout': 20},
     }
 }
-#DATABASES['default'] = dj_database_url.parse('postgresql://bookmyseat_fyhp_user:BWttW3oY0CYJmhtsw6SzZQMHxK8TVgBk@dpg-d9oqji7qj5pc738712ng-a.oregon-postgres.render.com/bookmyseat_fyhp')
-# postgresql://bookmyseat_fyhp_user:BWttW3oY0CYJmhtsw6SzZQMHxK8TVgBk@dpg-d9oqji7qj5pc738712ng-a.oregon-postgres.render.com/bookmyseat_fyhp
+DATABASES['default'] = dj_database_url.parse('postgresql://neondb_owner:npg_RviXexE9d5ho@ep-odd-shadow-azvx8ld3-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require')
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
