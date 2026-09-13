@@ -1,0 +1,121 @@
+{% extends "users/basic.html" %} {% block content %}
+<div class="container mt-5">
+  <div class="row">
+    <div class="col-lg-6 mx-auto text-center">
+      <div class="card">
+        <div class="card-body">
+          <h4 class="card-title">Pay to confirm your booking</h4>
+          <p class="text-muted">
+            {{ theater.movie.name }} &middot; {{ theater.name }} &middot; {{ theater.time }}
+          </p>
+          <p class="mb-1">Seats:</p>
+          <h5 class="mb-3">
+            {% for seat in seats %}
+              <span class="badge badge-success mr-1">{{ seat.seat_number }}</span>
+            {% endfor %}
+          </h5>
+          <h5 class="mb-4">Amount payable: &#8377;{{ payment.amount }}</h5>
+
+          {% if not razorpay_key_id %}
+          <div class="alert alert-warning">
+            Payments aren't configured yet - the site admin needs to set
+            <code>RAZORPAY_KEY_ID</code> / <code>RAZORPAY_KEY_SECRET</code>.
+          </div>
+          {% else %}
+          <button id="pay-btn" class="btn btn-success btn-lg">
+            <i class="fas fa-credit-card"></i> Pay with Razorpay
+          </button>
+          <p class="text-muted small mt-3">
+            Your seat hold expires shortly - if it lapses before you finish paying,
+            your seats will be released automatically.
+          </p>
+          {% endif %}
+
+          <div id="pay-error" class="alert alert-danger mt-3 d-none"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if razorpay_key_id %}
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+(function () {
+  const payBtn = document.getElementById('pay-btn');
+  const errorBox = document.getElementById('pay-error');
+  const csrfToken = "{{ csrf_token }}";
+  const verifyUrl = "{% url 'verify_payment' %}";
+  const failedUrl = "{% url 'mark_payment_failed' payment.id %}";
+  const profileUrl = "{% url 'profile' %}";
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.remove('d-none');
+  }
+
+  function notifyFailure(reason) {
+    fetch(failedUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRFToken': csrfToken,
+      },
+      body: new URLSearchParams({ reason: reason || 'Payment failed' }),
+    });
+  }
+
+  payBtn.addEventListener('click', function () {
+    const options = {
+      key: "{{ razorpay_key_id }}",
+      amount: "{{ amount_paise }}",
+      currency: "INR",
+      name: "BookMySeat",
+      description: "Movie ticket payment",
+      order_id: "{{ payment.razorpay_order_id }}",
+      handler: function (response) {
+        fetch(verifyUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken,
+          },
+          body: new URLSearchParams({
+            payment_db_id: "{{ payment.id }}",
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+          }),
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.ok) {
+              window.location.href = profileUrl;
+            } else {
+              showError(data.error || 'Payment verification failed. Please contact support.');
+            }
+          })
+          .catch(() => showError('Could not verify payment. Please contact support.'));
+      },
+      modal: {
+        ondismiss: function () {
+          notifyFailure('Checkout dismissed by user');
+        },
+      },
+      prefill: {
+        email: "{{ request.user.email }}",
+      },
+      theme: { color: '#28a745' },
+    };
+
+    const rzp = new Razorpay(options);
+    rzp.on('payment.failed', function (response) {
+      notifyFailure(response.error.description);
+      showError(response.error.description);
+    });
+    rzp.open();
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

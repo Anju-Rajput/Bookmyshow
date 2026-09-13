@@ -1,0 +1,213 @@
+{% extends "users/basic.html" %} {% block content %}
+<div class="container-fluid mt-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
+    <h3>Admin Analytics Dashboard</h3>
+  </div>
+
+  <!-- Date range + granularity filter -->
+  <form method="GET" class="form-inline card card-body mb-4 flex-wrap">
+    <label class="mr-2">From</label>
+    <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" class="form-control mr-3 mb-2">
+    <label class="mr-2">To</label>
+    <input type="date" name="end" value="{{ end|date:'Y-m-d' }}" class="form-control mr-3 mb-2">
+    <label class="mr-2">Group by</label>
+    <select name="granularity" class="form-control mr-3 mb-2">
+      <option value="daily" {% if granularity == 'daily' %}selected{% endif %}>Daily</option>
+      <option value="weekly" {% if granularity == 'weekly' %}selected{% endif %}>Weekly</option>
+      <option value="monthly" {% if granularity == 'monthly' %}selected{% endif %}>Monthly</option>
+      <option value="yearly" {% if granularity == 'yearly' %}selected{% endif %}>Yearly</option>
+    </select>
+    <button type="submit" class="btn btn-primary mb-2">Apply</button>
+  </form>
+
+  <!-- Summary cards -->
+  <div class="row mb-4">
+    <div class="col-md-6 mb-3">
+      <div class="card text-white bg-success h-100">
+        <div class="card-body">
+          <h6 class="card-title">Total Revenue</h6>
+          <h2>&#8377;{{ total_revenue }}</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 mb-3">
+      <div class="card text-white bg-primary h-100">
+        <div class="card-body">
+          <h6 class="card-title">Total Bookings</h6>
+          <h2>{{ total_bookings }}</h2>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trend charts -->
+  <div class="row mb-4">
+    <div class="col-md-6 mb-3">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          Revenue Trend
+          {% if can_export %}<a href="{% url 'dashboard_export' 'revenue' %}?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}&granularity={{ granularity }}" class="btn btn-sm btn-outline-secondary">Export CSV</a>{% endif %}
+        </div>
+        <div class="card-body"><canvas id="revenueChart"></canvas></div>
+      </div>
+    </div>
+    <div class="col-md-6 mb-3">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          Booking Trend
+          {% if can_export %}<a href="{% url 'dashboard_export' 'bookings' %}?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}&granularity={{ granularity }}" class="btn btn-sm btn-outline-secondary">Export CSV</a>{% endif %}
+        </div>
+        <div class="card-body"><canvas id="bookingChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mb-4">
+    <div class="col-md-6 mb-3">
+      <div class="card">
+        <div class="card-header">Peak Booking Hours</div>
+        <div class="card-body"><canvas id="peakHoursChart"></canvas></div>
+      </div>
+    </div>
+    <div class="col-md-6 mb-3">
+      <div class="card">
+        <div class="card-header">User Growth</div>
+        <div class="card-body"><canvas id="userGrowthChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Occupancy table -->
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      Theater Occupancy
+      {% if can_export %}<a href="{% url 'dashboard_export' 'occupancy' %}?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary">Export CSV</a>{% endif %}
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Theater</th><th>Movie</th><th>Booked / Total Seats</th><th>Occupancy %</th></tr></thead>
+        <tbody>
+          {% for row in occupancy %}
+          <tr>
+            <td>{{ row.name }}</td>
+            <td>{{ row.movie__name }}</td>
+            <td>{{ row.booked_seats }} / {{ row.total_seats }}</td>
+            <td>{{ row.occupancy_pct }}%</td>
+          </tr>
+          {% empty %}<tr><td colspan="4" class="text-muted">No shows in this range.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Most booked movies -->
+    <div class="col-md-6 mb-4">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          Most Booked Movies
+          {% if can_export %}<a href="{% url 'dashboard_export' 'movies' %}?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary">Export CSV</a>{% endif %}
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Movie</th><th>Bookings</th></tr></thead>
+            <tbody>
+              {% for row in most_booked_movies %}
+              <tr><td>{{ row.name }}</td><td>{{ row.booking_count }}</td></tr>
+              {% empty %}<tr><td colspan="2" class="text-muted">No data.</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top theaters -->
+    <div class="col-md-6 mb-4">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          Top-Performing Theaters
+          {% if can_export %}<a href="{% url 'dashboard_export' 'theaters' %}?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary">Export CSV</a>{% endif %}
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Theater</th><th>Movie</th><th>Bookings</th><th>Revenue</th></tr></thead>
+            <tbody>
+              {% for row in top_theaters %}
+              <tr><td>{{ row.name }}</td><td>{{ row.movie__name }}</td><td>{{ row.bookings }}</td><td>&#8377;{{ row.revenue }}</td></tr>
+              {% empty %}<tr><td colspan="4" class="text-muted">No data.</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cancellation / refund stats -->
+  <div class="card mb-5">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      Payment Status Breakdown (Cancellations &amp; Refunds)
+      {% if can_export %}<a href="{% url 'dashboard_export' 'cancellations' %}?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary">Export CSV</a>{% endif %}
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Status</th><th>Count</th><th>Total Amount</th></tr></thead>
+        <tbody>
+          {% for row in cancellation_stats %}
+          <tr><td class="text-capitalize">{{ row.status }}</td><td>{{ row.count }}</td><td>&#8377;{{ row.total_amount|default:0 }}</td></tr>
+          {% empty %}<tr><td colspan="3" class="text-muted">No payments in this range.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{{ revenue_trend|json_script:"revenue-data" }}
+{{ booking_trend|json_script:"booking-data" }}
+{{ peak_hours|json_script:"peak-hours-data" }}
+{{ user_growth_data|json_script:"user-growth-data" }}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+(function () {
+  function labelFor(period) {
+    return period; // already an ISO date/week/month string from json_script
+  }
+
+  const revenue = JSON.parse(document.getElementById('revenue-data').textContent);
+  new Chart(document.getElementById('revenueChart'), {
+    type: 'line',
+    data: {
+      labels: revenue.map(r => labelFor(r.period)),
+      datasets: [{ label: 'Revenue (INR)', data: revenue.map(r => r.total), borderColor: '#28a745', tension: 0.2 }],
+    },
+  });
+
+  const bookings = JSON.parse(document.getElementById('booking-data').textContent);
+  new Chart(document.getElementById('bookingChart'), {
+    type: 'line',
+    data: {
+      labels: bookings.map(r => labelFor(r.period)),
+      datasets: [{ label: 'Bookings', data: bookings.map(r => r.count), borderColor: '#007bff', tension: 0.2 }],
+    },
+  });
+
+  const peakHours = JSON.parse(document.getElementById('peak-hours-data').textContent);
+  new Chart(document.getElementById('peakHoursChart'), {
+    type: 'bar',
+    data: {
+      labels: peakHours.map(r => r.hour + ':00'),
+      datasets: [{ label: 'Bookings by hour', data: peakHours.map(r => r.count), backgroundColor: '#ffc107' }],
+    },
+  });
+
+  const userGrowth = JSON.parse(document.getElementById('user-growth-data').textContent);
+  new Chart(document.getElementById('userGrowthChart'), {
+    type: 'line',
+    data: {
+      labels: userGrowth.map(r => labelFor(r.period)),
+      datasets: [{ label: 'New users', data: userGrowth.map(r => r.count), borderColor: '#6f42c1', tension: 0.2 }],
+    },
+  });
+})();
+</script>
+{% endblock %}

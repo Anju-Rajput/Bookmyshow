@@ -1,0 +1,215 @@
+{% extends "users/basic.html" %} {% block content %}
+<div class="container mt-5">
+  <div class="row">
+    <div class="col-lg-8 mx-auto">
+      <!-- Movie and Theater Info -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center flex-wrap">
+            <div>
+              <h4 class="card-title">{{ theater.movie.name }}</h4>
+              <p class="card-text text-muted">{{ theater.name }} | {{ theater.time }}</p>
+            </div>
+            <div class="mt-2 mt-sm-0">
+              <button type="button" id="ticket-count-btn" class="btn btn-outline-primary mb-2 mb-sm-0">
+                0 Tickets
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+
+      <!-- Seat Selection -->
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title text-center mb-2">Select Your Seats</h5>
+          <p class="text-center text-muted small mb-3" id="live-note">
+            <i class="fas fa-circle-notch fa-spin"></i> Live availability - updates automatically
+          </p>
+          <div class="screen">All eyes this way please!</div>
+
+          <form method="POST" action="{% url 'reserve_seats' theater.id %}" id="seat-form">
+            {% csrf_token %}
+            <div class="d-flex justify-content-center flex-wrap mb-4" id="seat-grid">
+              {% for row in seat_view %}
+              <div class="seat
+                          {% if row.status == 'booked' %}sold
+                          {% elif row.status == 'reserved' %}held-by-others
+                          {% elif row.status == 'reserved_by_you' or row.selected %}selected{% endif %}"
+                   data-seat-id="{{ row.obj.id }}"
+                   data-status="{{ row.status }}">
+                {% if row.status == 'available' or row.status == 'reserved_by_you' %}
+                <input
+                  type="checkbox"
+                  name="seats"
+                  value="{{ row.obj.id }}"
+                  class="d-none seat-checkbox"
+                  id="seat-{{ row.obj.id }}"
+                  {% if row.status == 'reserved_by_you' %}checked{% endif %}
+                />
+                <label
+                  for="seat-{{ row.obj.id }}"
+                  class="w-100 h-100 d-flex align-items-center justify-content-center"
+                  >{{ row.obj.seat_number }}</label
+                >
+                {% else %}
+                {{ row.obj.seat_number }}
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
+
+            <!-- Seat Legend -->
+            <div class="d-flex justify-content-center flex-wrap mb-4">
+              <div class="d-flex align-items-center me-4 mb-2">
+                <div class="seat" style="background-color: white"></div>
+                <span class="ms-2">Available</span>
+              </div>
+              <div class="d-flex align-items-center me-4 mb-2">
+                <div class="seat selected"></div>
+                <span class="ms-2">Selected (your hold)</span>
+              </div>
+              <div class="d-flex align-items-center me-4 mb-2">
+                <div class="seat held-by-others"></div>
+                <span class="ms-2">Reserved (2 min hold)</span>
+              </div>
+              <div class="d-flex align-items-center mb-2">
+                <div class="seat sold"></div>
+                <span class="ms-2">Booked</span>
+              </div>
+            </div>
+
+            <p class="text-center text-muted small">
+              Selected seats are held for you for {{ reservation_minutes }} minutes.
+              If payment isn't completed in that time, they're released automatically.
+            </p>
+
+            <!-- Book Button -->
+            <div class="text-center">
+              <button type="submit" class="btn btn-success btn-lg" id="proceed-btn" disabled>
+                Reserve &amp; Proceed to Payment
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+  }
+  .seat {
+    width: 34px;
+    height: 34px;
+    border: 1px solid #28a745;
+    margin: 3px;
+    text-align: center;
+    line-height: 34px;
+    cursor: pointer;
+    border-radius: 5px;
+    font-size: 12px;
+    transition: background-color 0.3s, color 0.3s;
+  }
+  .seat:hover {
+    background-color: #28a745;
+    color: white;
+  }
+  .seat.selected {
+    background-color: #28a745;
+    color: white;
+  }
+  .seat.sold {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    color: white;
+    cursor: not-allowed;
+  }
+  .seat.sold:hover {
+    background-color: #6c757d;
+  }
+  .seat.held-by-others {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #333;
+    cursor: not-allowed;
+  }
+  .seat.held-by-others:hover {
+    background-color: #ffc107;
+  }
+  .screen {
+    margin: 20px 0;
+    background-color: #ccc;
+    height: 50px;
+    text-align: center;
+    line-height: 50px;
+    color: #666;
+  }
+</style>
+
+<script>
+(function () {
+  const theaterId = {{ theater.id }};
+  const statusUrl = "{% url 'seat_status_api' theater.id %}";
+  const grid = document.getElementById('seat-grid');
+  const proceedBtn = document.getElementById('proceed-btn');
+  const ticketBtn = document.getElementById('ticket-count-btn');
+
+  function updateProceedState() {
+    const checked = grid.querySelectorAll('.seat-checkbox:checked').length;
+    proceedBtn.disabled = checked === 0;
+    ticketBtn.textContent = checked + (checked === 1 ? ' Ticket' : ' Tickets');
+  }
+
+  // Toggle selection when clicking a seat that's available or already yours.
+  grid.addEventListener('change',function(e){
+    if (!e.target.classList.contains('sea-checkbox')) return;
+    const seatDiv=e.target.closest('.seat');
+    seatDiv.classList.toggle('selected',e.target.checked);
+    updateProceedState();
+  });
+
+  updateProceedState();
+
+  // Poll live seat status every 4 seconds so other users' holds/bookings show up.
+  function refreshStatus() {
+    fetch(statusUrl, { credentials: 'same-origin' })
+      .then((res) => res.json())
+      .then((data) => {
+        data.seats.forEach((seat) => {
+          const seatDiv = grid.querySelector('[data-seat-id="' + seat.id + '"]');
+          if (!seatDiv) return;
+          const checkbox = seatDiv.querySelector('.seat-checkbox');
+          const currentlyChecked = checkbox ? checkbox.checked : false;
+
+          seatDiv.dataset.status = seat.status;
+          seatDiv.classList.remove('sold', 'held-by-others', 'selected');
+
+          if (seat.status === 'booked') {
+            seatDiv.classList.add('sold');
+          } else if (seat.status === 'reserved') {
+            seatDiv.classList.add('held-by-others');
+            if (currentlyChecked) {
+              // Someone else grabbed it since our last check - drop it from our selection.
+              checkbox.checked = false;
+            }
+          } else if (seat.status === 'reserved_by_you' || currentlyChecked) {
+            seatDiv.classList.add('selected');
+          }
+        });
+        updateProceedState();
+      })
+      .catch(() => {});
+  }
+
+  setInterval(refreshStatus, 4000);
+})();
+</script>
+{% endblock %}

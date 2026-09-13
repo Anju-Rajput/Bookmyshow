@@ -1,0 +1,158 @@
+{% extends "users/basic.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <h1 class="text-center mb-4">Movies</h1>
+
+    {% if recommended_movies %}
+    <div class="mb-5">
+        <h4 class="mb-3"><i class="fas fa-thumbs-up text-success"></i> Recommended for You</h4>
+        <div class="row flex-nowrap overflow-auto pb-2">
+            {% for movie in recommended_movies %}
+            <div class="col-6 col-md-3 col-lg-2 mb-2" style="min-width: 160px;">
+                <a href="{% url 'movie_detail' movie.id %}" class="text-decoration-none text-dark">
+                    <img src="{{ movie.image.url }}" class="img-fluid rounded" alt="{{ movie.name }}" style="height:140px; width:100%; object-fit:cover;">
+                    <p class="small mt-1 mb-0 text-truncate">{{ movie.name }}</p>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        <hr>
+    </div>
+    {% endif %}
+
+    <!-- Filters -->
+    <form id="discoveryForm" method="GET" action="{% url 'movie_list' %}" class="card card-body mb-4">
+        <div class="form-row">
+            <div class="col-md-4 mb-2">
+                <input class="form-control" name="q" placeholder="Search movies by title..."
+                       type="text" value="{{ current.q|default_if_none:'' }}">
+            </div>
+            <div class="col-md-2 mb-2">
+                <select class="form-control" name="language">
+                    <option value="">Any Language</option>
+                    {% for lang in languages %}
+                    <option value="{{ lang.id }}" {% if current.language == lang.id|stringformat:'s' %}selected{% endif %}>{{ lang.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 mb-2">
+                <select class="form-control" name="city">
+                    <option value="">Any City</option>
+                    {% for c in cities %}
+                    <option value="{{ c }}" {% if current.city == c %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 mb-2">
+                <input class="form-control" name="show_date" type="date" value="{{ current.show_date|default_if_none:'' }}" title="Showtime date">
+            </div>
+            <div class="col-md-2 mb-2">
+                <select class="form-control" name="sort">
+                    {% for key, label in sort_options.items %}
+                    <option value="{{ key }}" {% if current.sort == key %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="col-md-3 mb-2">
+                <label class="small mb-0">Genres</label>
+                <select class="form-control" name="genre" multiple size="1">
+                    {% for genre in genres %}
+                    <option value="{{ genre.id }}" {% if genre.id|stringformat:'s' in current.genre|default_if_none:'' %}selected{% endif %}>{{ genre.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 mb-2">
+                <label class="small mb-0">Min Rating</label>
+                <select class="form-control" name="min_rating">
+                    <option value="">Any</option>
+                    {% for r in "12345" %}
+                    <option value="{{ r }}" {% if current.min_rating == r %}selected{% endif %}>{{ r }}+</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 mb-2">
+                <label class="small mb-0">Released From</label>
+                <input class="form-control" name="release_from" type="date" value="{{ current.release_from|default_if_none:'' }}">
+            </div>
+            <div class="col-md-2 mb-2">
+                <label class="small mb-0">Released To</label>
+                <input class="form-control" name="release_to" type="date" value="{{ current.release_to|default_if_none:'' }}">
+            </div>
+            <div class="col-md-3 mb-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fas fa-filter"></i> Apply Filters
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Results (also the AJAX-swappable target) -->
+    <div id="resultsContainer">
+        {% include "movies/_movie_results.html" %}
+    </div>
+</div>
+
+<!-- Bootstrap JS and dependencies -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+
+<style>
+    .card { transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out; }
+    .card:hover { transform: translateY(-5px); box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important; }
+</style>
+
+<script>
+(function () {
+    const form = document.getElementById('discoveryForm');
+    const resultsContainer = document.getElementById('resultsContainer');
+    const searchUrl = "{% url 'movie_search_results' %}";
+    let debounceTimer = null;
+
+    function fetchResults(page) {
+        const params = new URLSearchParams(new FormData(form));
+        if (page) params.set('page', page);
+        fetch(searchUrl + '?' + params.toString(), { credentials: 'same-origin' })
+            .then((r) => r.text())
+            .then((html) => {
+                resultsContainer.innerHTML = html;
+                attachPaginationHandlers();
+                // Keep the URL bookmarkable/shareable without a full reload.
+                const newUrl = window.location.pathname + '?' + params.toString();
+                window.history.replaceState({}, '', newUrl);
+            });
+    }
+
+    function attachPaginationHandlers() {
+        resultsContainer.querySelectorAll('#moviePagination .page-link').forEach((link) => {
+            link.addEventListener('click', function (e) {
+                e.preventDefault();
+                fetchResults(this.dataset.page);
+                window.scrollTo({ top: resultsContainer.offsetTop - 20, behavior: 'smooth' });
+            });
+        });
+    }
+
+    // "Dynamically display the number of matching movies after each filter" -
+    // any change to a filter control re-runs the search immediately (debounced
+    // for the free-text search box so we don't fire on every keystroke).
+    form.querySelectorAll('select, input[type="date"]').forEach((el) => {
+        el.addEventListener('change', function () { fetchResults(); });
+    });
+    form.querySelector('input[name="q"]').addEventListener('input', function () {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function () { fetchResults(); }, 400);
+    });
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        fetchResults();
+    });
+
+    attachPaginationHandlers();
+})();
+</script>
+{% endblock %}

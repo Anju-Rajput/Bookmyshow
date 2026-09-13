@@ -1,0 +1,58 @@
+{% extends "users/basic.html" %} {% block content %}
+<div class="container mt-5">
+  <div class="row">
+    <div class="col-lg-6 mx-auto">
+      <div class="card">
+        <div class="card-body text-center">
+          <h4 class="card-title">Confirm &amp; Pay</h4>
+          <p class="text-muted">{{ theater.movie.name }} &middot; {{ theater.name }} &middot; {{ theater.time }}</p>
+
+          <p class="mb-1">Seats:</p>
+          <h5 class="mb-3">
+            {% for seat in seats %}
+              <span class="badge badge-success mr-1">{{ seat.seat_number }}</span>
+            {% endfor %}
+          </h5>
+
+          <div class="alert alert-warning" id="timer-alert">
+            Your seats are held for <strong id="countdown">{{ seconds_left }}</strong> seconds.
+            Complete payment before the timer runs out or they'll be released automatically.
+          </div>
+
+          <form method="GET" action="{% url 'create_payment_order' theater.id %}" id="pay-form">
+            <button type="submit" class="btn btn-success btn-lg btn-block" id="pay-btn">
+              <i class="fas fa-lock"></i> Proceed to Payment
+            </button>
+          </form>
+
+          <a href="{% url 'book_seats' theater.id %}" class="btn btn-link mt-2">
+            Modify Selection
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  let secondsLeft = {{ seconds_left }};
+  const countdownEl = document.getElementById('countdown');
+  const payBtn = document.getElementById('pay-btn');
+  const bookSeatsUrl = "{% url 'book_seats' theater.id %}";
+
+  const timer = setInterval(function () {
+    secondsLeft -= 1;
+    if (secondsLeft <= 0) {
+      clearInterval(timer);
+      countdownEl.textContent = '0';
+      payBtn.disabled = true;
+      payBtn.textContent = 'Hold expired';
+      window.location.href = bookSeatsUrl;
+      return;
+    }
+    countdownEl.textContent = secondsLeft;
+  }, 1000);
+})();
+</script>
+{% endblock %}

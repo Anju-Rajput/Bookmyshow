@@ -1,0 +1,59 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <span id="resultCount" class="text-muted">
+    <strong>{{ total_count }}</strong> movie{{ total_count|pluralize }} found
+  </span>
+</div>
+
+<div class="row" id="movieList">
+  {% for movie in page_obj %}
+  <div class="col-md-4 mb-4">
+    <div class="card h-100 shadow-sm">
+      <img src="{{ movie.image.url }}" class="card-img-top" alt="{{ movie.name }}" style="height: 300px; object-fit: cover;">
+      <div class="card-body">
+        <h5 class="card-title">{{ movie.name }}</h5>
+        <p class="card-text">
+          <i class="fas fa-star text-warning"></i> {{ movie.rating }}
+          {% if movie.language %}<span class="badge badge-light border ml-1">{{ movie.language.name }}</span>{% endif %}
+          {% for genre in movie.genres.all %}<span class="badge badge-info ml-1">{{ genre.name }}</span>{% endfor %}
+        </p>
+        <p class="card-text">
+          <small class="text-muted">
+            <i class="fas fa-rupee-sign"></i> &#8377;{{ movie.ticket_price }}
+            {% if movie.release_date %} &middot; <i class="fas fa-calendar"></i> {{ movie.release_date }}{% endif %}
+          </small>
+        </p>
+      </div>
+      <div class="card-footer bg-white border-top-0">
+        <a href="{% url 'movie_detail' movie.id %}" class="btn btn-primary btn-block mb-2">
+          View Details <i class="fas fa-info-circle ml-2"></i>
+        </a>
+        <a href="{% url 'theater_list' movie.id %}" class="btn btn-outline-primary btn-block">
+          View Theaters <i class="fas fa-chevron-right ml-2"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="col-12 text-center">
+    <p class="lead">No movies match your filters. Try widening your search.</p>
+  </div>
+  {% endfor %}
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav aria-label="Movie results pages">
+  <ul class="pagination justify-content-center" id="moviePagination">
+    {% if page_obj.has_previous %}
+    <li class="page-item"><a class="page-link" href="#" data-page="{{ page_obj.previous_page_number }}">Previous</a></li>
+    {% endif %}
+    {% for num in page_obj.paginator.page_range %}
+    <li class="page-item {% if num == page_obj.number %}active{% endif %}">
+      <a class="page-link" href="#" data-page="{{ num }}">{{ num }}</a>
+    </li>
+    {% endfor %}
+    {% if page_obj.has_next %}
+    <li class="page-item"><a class="page-link" href="#" data-page="{{ page_obj.next_page_number }}">Next</a></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}

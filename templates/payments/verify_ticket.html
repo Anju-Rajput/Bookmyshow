@@ -1,0 +1,25 @@
+{% extends "users/basic.html" %} {% block content %}
+<div class="container mt-5">
+  <div class="row">
+    <div class="col-lg-6 mx-auto">
+      <div class="card">
+        <div class="card-body text-center">
+          {% if valid %}
+            {% if payment_status == 'successful' %}
+              <div class="alert alert-success mb-3"><i class="fas fa-check-circle"></i> Valid Ticket</div>
+            {% else %}
+              <div class="alert alert-warning mb-3"><i class="fas fa-exclamation-triangle"></i> Payment status: {{ payment_status }}</div>
+            {% endif %}
+            <h4>{{ movie.name }}</h4>
+            <p class="text-muted mb-1">{{ theater.name }} &middot; {{ theater.time }}</p>
+            <p class="mb-1"><strong>Seats:</strong> {{ seats }}</p>
+            <p class="text-muted small">Booking ID: {{ booking_reference }}</p>
+          {% else %}
+            <div class="alert alert-danger mb-0"><i class="fas fa-times-circle"></i> This ticket could not be verified.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
